@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>DOOM Style Shooter - Fixed Gun Bobbing</title>
+<style>
+  html, body {
+    margin: 0; overflow: hidden; background: #222;
+  }
+  canvas { display: block; }
+  #gun {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    image-rendering: pixelated;
+    height: 50%;
+    pointer-events: none;
+    user-select: none;
+  }
+</style>
+</head>
+<body>
+<img id="gun" src="gun.png" />
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+  let scene = new THREE.Scene()
+  let camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000)
+  let renderer = new THREE.WebGLRenderer()
+  renderer.setSize(window.innerWidth, window.innerHeight)
+  document.body.appendChild(renderer.domElement)
+
+  let ambientLight = new THREE.AmbientLight(0xffffff, 0.7)
+  scene.add(ambientLight)
+  let dirLight = new THREE.DirectionalLight(0xffffff, 0.5)
+  dirLight.position.set(1,2,3)
+  scene.add(dirLight)
+
+  const textureLoader = new THREE.TextureLoader()
+  const wallTexture = textureLoader.load("wall.png")
+  wallTexture.magFilter = THREE.NearestFilter
+
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(200, 200),
+    new THREE.MeshBasicMaterial({color: 0x555555})
+  )
+  floor.rotation.x = -Math.PI / 2
+  scene.add(floor)
+
+  const mapSize = 10
+  for(let x = -mapSize*5; x <= mapSize*5; x += 10){
+    for(let z = -mapSize*5; z <= mapSize*5; z += 10){
+      if(Math.random() > 0.7){
+        const wall = new THREE.Mesh(
+          new THREE.BoxGeometry(10,10,1),
+          new THREE.MeshPhongMaterial({map: wallTexture})
+        )
+        wall.position.set(x,5,z)
+        wall.rotation.y = Math.random() > 0.5 ? 0 : Math.PI/2
+        scene.add(wall)
+      }
+    }
+  }
+
+  camera.position.set(0,2,0)
+  camera.rotation.order = 'YXZ'
+
+  const gunImg = document.getElementById("gun")
+  const gunFrames = [
+    "gun.png",
+    "gun1.png",
+    "gun2.png",
+    "gun3.png",
+    "gun4.png",
+    "gun3.png",
+    "gun2.png",
+    "gun1.png",
+    "gun.png"
+  ]
+
+  let firing = false
+  let frameIndex = 0
+  let fireCooldown = false
+
+  function fireGun(){
+    if(firing || fireCooldown) return
+    firing = true
+    fireCooldown = true
+    let interval = setInterval(() => {
+      gunImg.src = gunFrames[frameIndex]
+      frameIndex++
+      if(frameIndex >= gunFrames.length){
+        clearInterval(interval)
+        frameIndex = 0
+        firing = false
+        setTimeout(() => fireCooldown = false, 400)
+      }
+    }, 120) // slowed to 120ms per frame
+  }
+
+  window.addEventListener("keydown", e => {
+    if(e.code === "Space") fireGun()
+    keys[e.key.toLowerCase()] = true
+  })
+  window.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false)
+
+  let isPointerLocked = false
+  document.body.requestPointerLock = document.body.requestPointerLock || document.body.mozRequestPointerLock
+
+  document.body.onclick = () => {
+    if(!isPointerLocked){
+      document.body.requestPointerLock()
+    }
+  }
+
+  document.addEventListener('pointerlockchange', () => {
+    isPointerLocked = !!document.pointerLockElement
+  })
+
+  window.addEventListener('mousemove', e => {
+    if(isPointerLocked){
+      camera.rotation.y -= e.movementX * 0.002
+      if(camera.rotation.y < 0) camera.rotation.y += Math.PI * 2
+      if(camera.rotation.y > Math.PI * 2) camera.rotation.y -= Math.PI * 2
+    }
+  })
+
+  let keys = {}
+  let clock = new THREE.Clock()
+  let bobPhase = 0
+
+  function animate(){
+    requestAnimationFrame(animate)
+    let dt = clock.getDelta()
+    let walking = false
+    let speed = 5 * dt
+
+    if(keys["w"]){
+      camera.position.x -= Math.sin(camera.rotation.y) * speed
+      camera.position.z -= Math.cos(camera.rotation.y) * speed
+      walking = true
+    }
+    if(keys["s"]){
+      camera.position.x += Math.sin(camera.rotation.y) * speed
+      camera.position.z += Math.cos(camera.rotation.y) * speed
+      walking = true
+    }
+    if(keys["a"]){
+      camera.position.x -= Math.cos(camera.rotation.y) * speed
+      camera.position.z += Math.sin(camera.rotation.y) * speed
+      walking = true
+    }
+    if(keys["d"]){
+      camera.position.x += Math.cos(camera.rotation.y) * speed
+      camera.position.z -= Math.sin(camera.rotation.y) * speed
+      walking = true
+    }
+
+    // camera vertical fixed at 2
+    camera.position.y = 2
+
+    // gun viewbobbing (vertical + horizontal) - only when walking
+    if(walking){
+      bobPhase += dt * 12
+      let xBob = Math.sin(bobPhase * 2) * 5 // px horizontal
+      let yBob = Math.abs(Math.sin(bobPhase)) * 7 // px vertical
+      gunImg.style.transform = `translateX(calc(-50% + ${xBob}px)) translateY(-${yBob}px)`
+    } else {
+      gunImg.style.transform = 'translateX(-50%) translateY(0)'
+    }
+
+    renderer.render(scene, camera)
+  }
+
+  animate()
+
+  window.addEventListener("resize", () => {
+    camera.aspect = window.innerWidth/window.innerHeight
+    camera.updateProjectionMatrix()
+    renderer.setSize(window.innerWidth, window.innerHeight)
+  })
+</script>
+
+</body>
+</html>

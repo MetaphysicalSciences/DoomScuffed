@@ -2,46 +2,22 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>DOOM Style Shooter - Fixed Gun Bobbing & Mobile</title>
+<title>DOOM Style Shooter - Complex Maze</title>
 <style>
-html, body { margin:0; padding:0; overflow:hidden; background:#222; font-family:sans-serif; }
-canvas { display:block; }
-#gun {
-  position:absolute;
-  bottom:0;
-  left:50%;
-  transform:translateX(-50%);
-  image-rendering:pixelated;
-  height:50%;
-  pointer-events:none;
-  user-select:none;
-}
-#startUI {
-  position:absolute;
-  width:100%; height:100%;
-  background:rgba(0,0,0,0.95);
-  display:flex; flex-direction:column; justify-content:center; align-items:center;
-  color:white; z-index:10;
-}
-#startUI button {
-  font-size:2em; padding:1em 2em; margin:1em; cursor:pointer;
-  background:#444; color:white; border:none; border-radius:10px;
-}
-#mobileControls {
-  position:absolute; bottom:0; width:100%; height:40%;
-  display:flex; justify-content:space-between; align-items:flex-end; pointer-events:none;
-}
-.joystick, #shootButton {
-  pointer-events:auto; background:rgba(255,255,255,0.2); border-radius:50%;
-}
-.joystick { width:120px; height:120px; margin:20px; position:relative; touch-action:none; }
-.joystickInner {
-  width:60px; height:60px; background:rgba(255,255,255,0.5); border-radius:50%; position:absolute; left:30px; top:30px;
-}
-#shootButton { width:100px; height:100px; margin:20px; display:flex; justify-content:center; align-items:center; font-size:1.5em; color:white; }
+html,body{margin:0;padding:0;overflow:hidden;background:#222;font-family:sans-serif;}
+canvas{display:block;}
+#gun{position:absolute;bottom:0;left:50%;transform:translateX(-50%);image-rendering:pixelated;height:50%;pointer-events:none;user-select:none;}
+#startUI{position:absolute;width:100%;height:100%;background:rgba(0,0,0,0.95);display:flex;flex-direction:column;justify-content:center;align-items:center;color:white;z-index:10;}
+#startUI button{font-size:2em;padding:1em 2em;margin:1em;cursor:pointer;background:#444;color:white;border:none;border-radius:10px;}
+#mobileControls{position:absolute;bottom:0;width:100%;height:40%;display:flex;justify-content:space-between;align-items:flex-end;pointer-events:none;}
+.joystick,#shootButton{pointer-events:auto;background:rgba(255,255,255,0.2);border-radius:50%;}
+.joystick{width:120px;height:120px;margin:20px;position:relative;touch-action:none;}
+.joystickInner{width:60px;height:60px;background:rgba(255,255,255,0.5);border-radius:50%;position:absolute;left:30px;top:30px;}
+#shootButton{width:100px;height:100px;margin:20px;display:flex;justify-content:center;align-items:center;font-size:1.5em;color:white;}
 </style>
 </head>
 <body>
+
 <div id="startUI">
   <h1>DOOM Style Shooter</h1>
   <p>Choose your platform:</p>
@@ -50,182 +26,203 @@ canvas { display:block; }
 </div>
 
 <img id="gun" src="gun.png" />
-
 <div id="mobileControls" style="display:none;">
   <div class="joystick"><div class="joystickInner"></div></div>
   <div id="shootButton">FIRE</div>
+  <div class="joystick" id="cameraJoystick"><div class="joystickInner"></div></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script>
-let scene = new THREE.Scene()
-let camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000)
-let renderer = new THREE.WebGLRenderer({antialias:false})
-renderer.setSize(window.innerWidth, window.innerHeight)
+let scene=new THREE.Scene()
+let camera=new THREE.PerspectiveCamera(75,window.innerWidth/window.innerHeight,0.1,1000)
+let renderer=new THREE.WebGLRenderer({antialias:false})
+renderer.setSize(window.innerWidth,window.innerHeight)
 document.body.appendChild(renderer.domElement)
 
-let ambientLight = new THREE.AmbientLight(0xffffff, 0.7)
+let ambientLight=new THREE.AmbientLight(0xffffff,0.7)
 scene.add(ambientLight)
-let dirLight = new THREE.DirectionalLight(0xffffff, 0.5)
+let dirLight=new THREE.DirectionalLight(0xffffff,0.5)
 dirLight.position.set(1,2,3)
 scene.add(dirLight)
 
-const textureLoader = new THREE.TextureLoader()
-const wallTexture = textureLoader.load("wall.png")
-wallTexture.magFilter = THREE.NearestFilter
+const textureLoader=new THREE.TextureLoader()
+const wallTexture=textureLoader.load("wall.png")
+wallTexture.magFilter=THREE.NearestFilter
 
-const floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(200, 200),
-  new THREE.MeshBasicMaterial({color: 0x555555})
-)
-floor.rotation.x = -Math.PI / 2
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(400,400),new THREE.MeshPhongMaterial({color:0x555555}))
+floor.rotation.x=-Math.PI/2
 scene.add(floor)
 
-// MAZE layout (predefined, GitHub-friendly)
-const mazeLayout = [
-  "##########",
-  "#        #",
-  "#  ##    #",
-  "#  ##    #",
-  "#        #",
-  "#   ##   #",
-  "#   ##   #",
-  "#        #",
-  "#        #",
-  "##########"
+const ceiling=new THREE.Mesh(new THREE.PlaneGeometry(400,400),new THREE.MeshPhongMaterial({color:0x333333}))
+ceiling.position.y=10
+ceiling.rotation.x=Math.PI/2
+scene.add(ceiling)
+
+let colliders=[]
+const wallSize=10
+// Complex maze: # walls, S stairs, C cylinder pillars, space empty
+const maze=[
+"###############",
+"#       C     #",
+"# ### ### ### #",
+"# S   #     S #",
+"# ### # ### ###",
+"#   #   #     #",
+"# # ### # ### #",
+"#   #   #   C #",
+"###############"
 ]
-const wallSize = 10
-for(let i=0;i<mazeLayout.length;i++){
-  for(let j=0;j<mazeLayout[i].length;j++){
-    if(mazeLayout[i][j]==="#"){
-      const wall = new THREE.Mesh(
-        new THREE.BoxGeometry(wallSize,10,wallSize),
-        new THREE.MeshPhongMaterial({map:wallTexture})
-      )
-      wall.position.set(j*wallSize,5,i*wallSize)
+
+for(let i=0;i<maze.length;i++){
+  for(let j=0;j<maze[i].length;j++){
+    let x=j*wallSize
+    let z=i*wallSize
+    if(maze[i][j]==="#"){
+      const wall=new THREE.Mesh(new THREE.BoxGeometry(wallSize,10,wallSize),new THREE.MeshPhongMaterial({map:wallTexture}))
+      wall.position.set(x,5,z)
       scene.add(wall)
+      colliders.push({mesh:wall})
+    }
+    if(maze[i][j]==="S"){
+      for(let s=0;s<5;s++){
+        const stair=new THREE.Mesh(new THREE.BoxGeometry(wallSize,2,wallSize),new THREE.MeshPhongMaterial({color:0x777777}))
+        stair.position.set(x,1+s*2,z)
+        scene.add(stair)
+        colliders.push({mesh:stair})
+      }
+    }
+    if(maze[i][j]==="C"){
+      const pillar=new THREE.Mesh(new THREE.CylinderGeometry(3,3,10,16),new THREE.MeshPhongMaterial({color:0x888888}))
+      pillar.position.set(x,5,z)
+      scene.add(pillar)
+      colliders.push({mesh:pillar})
     }
   }
 }
 
 camera.position.set(wallSize*1.5,2,wallSize*1.5)
-camera.rotation.order = 'YXZ'
+camera.rotation.order='YXZ'
 
-const gunImg = document.getElementById("gun")
-const gunFrames = ["gun.png","gun1.png","gun2.png","gun3.png","gun4.png","gun3.png","gun2.png","gun1.png","gun.png"]
+const gunImg=document.getElementById("gun")
+const gunFrames=["gun.png","gun1.png","gun2.png","gun3.png","gun4.png","gun3.png","gun2.png","gun1.png","gun.png"]
+let firing=false,frameIndex=0,fireCooldown=false
+function fireGun(){if(firing||fireCooldown)return;firing=true;fireCooldown=true;let interval=setInterval(()=>{gunImg.src=gunFrames[frameIndex];frameIndex++;if(frameIndex>=gunFrames.length){clearInterval(interval);frameIndex=0;firing=false;setTimeout(()=>fireCooldown=false,400)}},120)}
 
-let firing = false
-let frameIndex = 0
-let fireCooldown = false
+let keys={}
+window.addEventListener("keydown",e=>{if(e.code==="Space")fireGun();keys[e.key.toLowerCase()]=true})
+window.addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false)
 
-function fireGun(){
-  if(firing || fireCooldown) return
-  firing = true
-  fireCooldown = true
-  let interval = setInterval(() => {
-    gunImg.src = gunFrames[frameIndex]
-    frameIndex++
-    if(frameIndex>=gunFrames.length){
-      clearInterval(interval)
-      frameIndex=0
-      firing=false
-      setTimeout(()=>fireCooldown=false,400)
-    }
-  },120)
-}
+let isPointerLocked=false
+document.body.requestPointerLock=document.body.requestPointerLock||document.body.mozRequestPointerLock
+document.body.onclick=()=>{if(!isPointerLocked&&!mobileMode){document.body.requestPointerLock()}}
+document.addEventListener('pointerlockchange',()=>{isPointerLocked=!!document.pointerLockElement})
+window.addEventListener('mousemove',e=>{if(isPointerLocked){camera.rotation.y-=e.movementX*0.002}})
 
-// KEYBOARD input
-let keys = {}
-window.addEventListener("keydown", e => {
-  if(e.code==="Space") fireGun()
-  keys[e.key.toLowerCase()] = true
-})
-window.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false)
+let mobileMode=false
+const joystick=document.querySelector('.joystick')
+const joystickInner=document.querySelector('.joystickInner')
+const cameraJoystick=document.getElementById('cameraJoystick')
+const cameraInner=cameraJoystick.querySelector('.joystickInner')
+let joyX=0,joyY=0,jActive=false
+let camX=0,cActive=false
 
-// POINTER LOCK
-let isPointerLocked = false
-document.body.requestPointerLock = document.body.requestPointerLock || document.body.mozRequestPointerLock
-document.body.onclick = () => { if(!isPointerLocked){document.body.requestPointerLock()} }
-document.addEventListener('pointerlockchange', ()=>{ isPointerLocked=!!document.pointerLockElement })
-window.addEventListener('mousemove', e => {
-  if(isPointerLocked){
-    camera.rotation.y -= e.movementX * 0.002
-  }
-})
-
-// MOBILE controls
-let mobileMode = false
-const joystick = document.querySelector('.joystick')
-const joystickInner = document.querySelector('.joystickInner')
-let joyX=0, joyY=0, joystickActive=false
-
-joystick.addEventListener('touchstart', e=>{ joystickActive=true })
-joystick.addEventListener('touchmove', e=>{
-  if(!joystickActive) return
+joystick.addEventListener('touchstart',e=>{jActive=true})
+joystick.addEventListener('touchmove',e=>{
+  if(!jActive)return
   const rect=joystick.getBoundingClientRect()
-  const touch = e.touches[0]
-  joyX = (touch.clientX-(rect.left+rect.width/2))/rect.width*2
-  joyY = (touch.clientY-(rect.top+rect.height/2))/rect.height*2
-  joystickInner.style.transform = `translate(${joyX*30}px, ${joyY*30}px)`
+  const touch=e.touches[0]
+  joyX=(touch.clientX-(rect.left+rect.width/2))/rect.width*2
+  joyY=(touch.clientY-(rect.top+rect.height/2))/rect.height*2
+  joystickInner.style.transform=`translate(${joyX*30}px,${joyY*30}px)`
 })
-joystick.addEventListener('touchend', e=>{ joystickActive=false; joyX=0; joyY=0; joystickInner.style.transform='translate(0,0)' })
+joystick.addEventListener('touchend',e=>{jActive=false;joyX=0;joyY=0;joystickInner.style.transform='translate(0,0)'})
 
-document.getElementById("shootButton").addEventListener('touchstart', fireGun)
+cameraJoystick.addEventListener('touchstart',e=>{cActive=true})
+cameraJoystick.addEventListener('touchmove',e=>{
+  if(!cActive)return
+  const rect=cameraJoystick.getBoundingClientRect()
+  const touch=e.touches[0]
+  camX=(touch.clientX-(rect.left+rect.width/2))/rect.width*2
+  cameraInner.style.transform=`translate(${camX*30}px,0)`
+})
+cameraJoystick.addEventListener('touchend',e=>{cActive=false;camX=0;cameraInner.style.transform='translate(0,0)'})
 
-// START UI
-document.getElementById("pcButton").onclick = ()=>{
-  document.getElementById("startUI").style.display="none"
-  mobileMode=false
+document.getElementById("shootButton").addEventListener('touchstart',fireGun)
+
+document.getElementById("pcButton").onclick=()=>{document.getElementById("startUI").style.display="none";mobileMode=false}
+document.getElementById("mobileButton").onclick=()=>{document.getElementById("startUI").style.display="none";document.getElementById("mobileControls").style.display="flex";mobileMode=true}
+
+function checkCollision(pos){
+  for(let c of colliders){
+    const box=new THREE.Box3().setFromObject(c.mesh)
+    if(box.containsPoint(pos)) return true
+  }
+  return false
 }
-document.getElementById("mobileButton").onclick = ()=>{
-  document.getElementById("startUI").style.display="none"
-  document.getElementById("mobileControls").style.display="flex"
-  mobileMode=true
-}
 
-let clock = new THREE.Clock()
-let bobPhase=0
+let clock=new THREE.Clock(),bobPhase=0
+
+// TEST TARGETS
+const targetTexture=textureLoader.load("IMG_0772-removebg-preview_imgupscaler.ai_v1(Fast)_2K.png")
+const deadTexture=textureLoader.load("IMG_0772-removebg-preview 3.png")
+let targets=[]
+function createTarget(x,z){
+  const spriteMat=new THREE.SpriteMaterial({map:targetTexture})
+  const sprite=new THREE.Sprite(spriteMat)
+  sprite.scale.set(5,5,1)
+  sprite.position.set(x,2.5,z)
+  scene.add(sprite)
+  targets.push(sprite)
+}
+createTarget(50,50)
+createTarget(100,30)
+createTarget(30,120)
 
 function animate(){
   requestAnimationFrame(animate)
-  let dt = clock.getDelta()
+  let dt=clock.getDelta()
   let walking=false
-  let speed = 5*dt
+  let speed=5*dt
 
+  let moveX=0,moveZ=0
   if(mobileMode){
-    camera.position.x -= Math.sin(camera.rotation.y)*joyY*speed
-    camera.position.z -= Math.cos(camera.rotation.y)*joyY*speed
-    camera.position.x += Math.cos(camera.rotation.y)*joyX*speed
-    camera.position.z -= Math.sin(camera.rotation.y)*joyX*speed
-    walking = Math.abs(joyX)>0.1 || Math.abs(joyY)>0.1
+    moveZ=-joyY*speed
+    moveX=joyX*speed
+    camera.rotation.y-=camX*dt*5
+    walking=Math.abs(joyX)>0.1||Math.abs(joyY)>0.1
   } else {
-    if(keys["w"]){ camera.position.x -= Math.sin(camera.rotation.y)*speed; camera.position.z -= Math.cos(camera.rotation.y)*speed; walking=true }
-    if(keys["s"]){ camera.position.x += Math.sin(camera.rotation.y)*speed; camera.position.z += Math.cos(camera.rotation.y)*speed; walking=true }
-    if(keys["a"]){ camera.position.x -= Math.cos(camera.rotation.y)*speed; camera.position.z += Math.sin(camera.rotation.y)*speed; walking=true }
-    if(keys["d"]){ camera.position.x += Math.cos(camera.rotation.y)*speed; camera.position.z -= Math.sin(camera.rotation.y)*speed; walking=true }
+    if(keys["w"]){moveZ=-speed;walking=true}
+    if(keys["s"]){moveZ=speed;walking=true}
+    if(keys["a"]){moveX=-speed;walking=true}
+    if(keys["d"]){moveX=speed;walking=true}
   }
+
+  let dirX=Math.sin(camera.rotation.y)*moveZ+Math.cos(camera.rotation.y)*moveX
+  let dirZ=Math.cos(camera.rotation.y)*moveZ-Math.sin(camera.rotation.y)*moveX
+  let nextPos=new THREE.Vector3(camera.position.x+dirX,2,camera.position.z+dirZ)
+  if(!checkCollision(nextPos)){camera.position.x+=dirX;camera.position.z+=dirZ}
 
   camera.position.y=2
 
-  if(walking){
-    bobPhase+=dt*12
-    let xBob=Math.sin(bobPhase*2)*5
-    let yBob=Math.abs(Math.sin(bobPhase))*7
-    gunImg.style.transform = `translateX(calc(-50% + ${xBob}px)) translateY(-${yBob}px)`
-  } else {
-    gunImg.style.transform = 'translateX(-50%) translateY(0)'
+  if(walking){bobPhase+=dt*12;let xBob=Math.sin(bobPhase*2)*5;let yBob=Math.abs(Math.sin(bobPhase))*7;gunImg.style.transform=`translateX(calc(-50% + ${xBob}px)) translateY(-${yBob}px)` }
+  else gunImg.style.transform='translateX(-50%) translateY(0)'
+
+  // Targets face player and visibility check
+  for(let t of targets){
+    let dir=new THREE.Vector3()
+    dir.subVectors(camera.position,t.position)
+    let raycaster=new THREE.Raycaster(camera.position,dir.clone().normalize(),0,50) // gun distance limit
+    let intersects=raycaster.intersectObjects(colliders.map(c=>c.mesh))
+    if(intersects.length===0){t.material.map=targetTexture}else{t.material.map=null} // cannot see through walls
+    t.lookAt(camera.position.x,t.position.y,camera.position.z)
   }
 
   renderer.render(scene,camera)
 }
-
 animate()
 
-window.addEventListener("resize", ()=>{
-  camera.aspect = window.innerWidth/window.innerHeight
-  camera.updateProjectionMatrix()
-  renderer.setSize(window.innerWidth, window.innerHeight)
-})
+window.addEventListener("resize",()=>{camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight)})
 </script>
 </body>
 </html>

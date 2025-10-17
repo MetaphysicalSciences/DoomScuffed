@@ -5,15 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>de_dust2 Walkaround</title>
 <style>
-  body { margin: 0; overflow: hidden; }
-  canvas { display: block; }
-  #mobileControls {
-    position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-    display: flex; gap: 10px;
-  }
-  .btn {
-    width: 60px; height: 60px; background: rgba(255,255,255,0.3); border-radius: 50%; text-align: center; line-height: 60px; font-weight: bold; user-select: none;
-  }
+body { margin: 0; overflow: hidden; }
+canvas { display: block; }
+#mobileControls {
+  position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 10px;
+}
+.btn {
+  width: 60px; height: 60px; background: rgba(255,255,255,0.3); border-radius: 50%; text-align: center; line-height: 60px; font-weight: bold; user-select: none;
+}
 </style>
 </head>
 <body>
@@ -23,11 +23,13 @@
   <div class="btn" id="back">↓</div>
   <div class="btn" id="right">→</div>
 </div>
+
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.161.1/build/three.module.js';
 import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.161.1/examples/jsm/controls/OrbitControls.js';
 import { OBJLoader } from 'https://cdn.jsdelivr.net/npm/three@0.161.1/examples/jsm/loaders/OBJLoader.js';
 import { MTLLoader } from 'https://cdn.jsdelivr.net/npm/three@0.161.1/examples/jsm/loaders/MTLLoader.js';
+import { TGALoader } from 'https://cdn.jsdelivr.net/npm/three@0.161.1/examples/jsm/loaders/TGALoader.js';
 import { AmmoPhysics } from 'https://cdn.jsdelivr.net/npm/@enable3d/ammo-physics@1.14.1/dist/ammo-physics.module.js';
 
 let scene, camera, renderer, physics;
@@ -41,7 +43,7 @@ async function init() {
   scene.background = new THREE.Color(0x87ceeb);
 
   camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-  
+
   renderer = new THREE.WebGLRenderer({antialias:true});
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
@@ -57,8 +59,10 @@ async function init() {
   physics = new AmmoPhysics(scene);
   physics.debug.enable(false);
 
-  // Load map
+  // MTL + OBJ Loader with TGALoader
+  const tgaLoader = new TGALoader();
   const mtlLoader = new MTLLoader();
+  mtlLoader.setTextureLoader(tgaLoader);
   mtlLoader.load('de_dust2.mtl', (materials) => {
     materials.preload();
     const objLoader = new OBJLoader();
@@ -79,7 +83,7 @@ async function init() {
   const radius = 0.5, height = 1.8;
   const shape = new Ammo.btCapsuleShape(radius, height - 2*radius);
   playerBody = physics.add.existing(new THREE.Object3D(), { mass: 80, shape: shape });
-  playerBody.body.setActivationState(4); // disable deactivation
+  playerBody.body.setActivationState(4);
   playerBody.position.set(0, 5, 0);
 
   // Pointer lock for desktop

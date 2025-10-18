@@ -2,154 +2,99 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>de_dust2 Walkaround</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>de_dust2 Web Walkaround</title>
 <style>
-body { margin: 0; overflow: hidden; }
-canvas { display: block; }
-#mobileControls {
-  position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-  display: flex; gap: 10px;
-}
-.btn {
-  width: 60px; height: 60px; background: rgba(255,255,255,0.3); border-radius: 50%; text-align: center; line-height: 60px; font-weight: bold; user-select: none;
-}
+html,body{margin:0;height:100%;overflow:hidden;background:#000}
+canvas{display:block}
 </style>
 </head>
 <body>
-<div id="mobileControls">
-  <div class="btn" id="forward">↑</div>
-  <div class="btn" id="left">←</div>
-  <div class="btn" id="back">↓</div>
-  <div class="btn" id="right">→</div>
-</div>
-
 <script type="module">
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.161.1/build/three.module.js';
-import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.161.1/examples/jsm/controls/OrbitControls.js';
-import { OBJLoader } from 'https://cdn.jsdelivr.net/npm/three@0.161.1/examples/jsm/loaders/OBJLoader.js';
-import { MTLLoader } from 'https://cdn.jsdelivr.net/npm/three@0.161.1/examples/jsm/loaders/MTLLoader.js';
-import { TGALoader } from 'https://cdn.jsdelivr.net/npm/three@0.161.1/examples/jsm/loaders/TGALoader.js';
-import { AmmoPhysics } from 'https://cdn.jsdelivr.net/npm/@enable3d/ammo-physics@1.14.1/dist/ammo-physics.module.js';
+import * as THREE from 'https://unpkg.com/three@0.161.1/build/three.module.js';
+import { MTLLoader } from 'https://unpkg.com/three@0.161.1/examples/jsm/loaders/MTLLoader.js';
+import { OBJLoader } from 'https://unpkg.com/three@0.161.1/examples/jsm/loaders/OBJLoader.js';
+import { TGALoader } from 'https://unpkg.com/three@0.161.1/examples/jsm/loaders/TGALoader.js';
+import { AmmoPhysics } from 'https://unpkg.com/@enable3d/ammo-physics@1.14.1/dist/ammo-physics.module.js';
 
-let scene, camera, renderer, physics;
-let playerBody, move = { forward: 0, back: 0, left: 0, right: 0 };
+let scene, camera, renderer, physics, player;
+let move={f:0,b:0,l:0,r:0};
 
 init();
 animate();
 
-async function init() {
-  scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x87ceeb);
-
-  camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-
-  renderer = new THREE.WebGLRenderer({antialias:true});
-  renderer.setSize(window.innerWidth, window.innerHeight);
+async function init(){
+  scene=new THREE.Scene();
+  scene.background=new THREE.Color(0x87ceeb);
+  camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,0.1,2000);
+  renderer=new THREE.WebGLRenderer({antialias:true});
+  renderer.setSize(innerWidth,innerHeight);
   document.body.appendChild(renderer.domElement);
-
-  // Lights
-  const ambient = new THREE.AmbientLight(0xffffff, 0.5);
-  scene.add(ambient);
-  const dirLight = new THREE.DirectionalLight(0xffffff, 1);
-  dirLight.position.set(10, 20, 10);
-  scene.add(dirLight);
-
-  // Physics
-  physics = new AmmoPhysics(scene);
+  const light=new THREE.DirectionalLight(0xffffff,1);
+  light.position.set(10,20,10);
+  scene.add(new THREE.AmbientLight(0xffffff,0.4),light);
+  physics=new AmmoPhysics(scene);
   physics.debug.enable(false);
 
-  // MTL + OBJ Loader with TGALoader
-  const tgaLoader = new TGALoader();
-  const mtlLoader = new MTLLoader();
-  mtlLoader.setTextureLoader(tgaLoader);
-  mtlLoader.load('de_dust2.mtl', (materials) => {
-    materials.preload();
-    const objLoader = new OBJLoader();
-    objLoader.setMaterials(materials);
-    objLoader.load('de_dust2.obj', (obj) => {
-      obj.traverse((child) => {
-        if (child.isMesh) {
-          child.castShadow = true;
-          child.receiveShadow = true;
-          physics.add.existing(child, { mass: 0, shape: 'concave' });
-        }
+  const tga=new TGALoader();
+  const mtl=new MTLLoader();mtl.setTextureLoader(tga);
+  mtl.load('de_dust2.mtl',m=>{
+    m.preload();
+    const obj=new OBJLoader();obj.setMaterials(m);
+    obj.load('de_dust2.obj',o=>{
+      o.traverse(c=>{
+        if(c.isMesh){c.castShadow=true;c.receiveShadow=true;physics.add.existing(c,{mass:0,shape:'concave'});}
       });
-      scene.add(obj);
+      scene.add(o);
     });
   });
 
-  // Player body
-  const radius = 0.5, height = 1.8;
-  const shape = new Ammo.btCapsuleShape(radius, height - 2*radius);
-  playerBody = physics.add.existing(new THREE.Object3D(), { mass: 80, shape: shape });
-  playerBody.body.setActivationState(4);
-  playerBody.position.set(0, 5, 0);
+  const radius=0.5,height=1.8;
+  const shape=new Ammo.btCapsuleShape(radius,height-2*radius);
+  player=physics.add.existing(new THREE.Object3D(),{mass:80,shape});
+  player.body.setActivationState(4);
+  player.position.set(0,5,0);
 
-  // Pointer lock for desktop
-  document.body.addEventListener('click', () => {
-    if(!document.pointerLockElement){
-      renderer.domElement.requestPointerLock();
-    }
-  });
-
-  // Desktop controls
-  document.addEventListener('mousemove', (e) => {
-    if(document.pointerLockElement === renderer.domElement){
-      playerBody.rotation.y -= e.movementX * 0.002;
-      camera.rotation.x -= e.movementY * 0.002;
-      camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
-    }
-  });
-
-  // Keyboard
-  document.addEventListener('keydown', (e) => { if(e.key === 'w') move.forward=1; if(e.key==='s') move.back=1; if(e.key==='a') move.left=1; if(e.key==='d') move.right=1; });
-  document.addEventListener('keyup', (e) => { if(e.key === 'w') move.forward=0; if(e.key==='s') move.back=0; if(e.key==='a') move.left=0; if(e.key==='d') move.right=0; });
-
-  // Mobile buttons
-  document.getElementById('forward').addEventListener('touchstart',()=>move.forward=1);
-  document.getElementById('forward').addEventListener('touchend',()=>move.forward=0);
-  document.getElementById('back').addEventListener('touchstart',()=>move.back=1);
-  document.getElementById('back').addEventListener('touchend',()=>move.back=0);
-  document.getElementById('left').addEventListener('touchstart',()=>move.left=1);
-  document.getElementById('left').addEventListener('touchend',()=>move.left=0);
-  document.getElementById('right').addEventListener('touchstart',()=>move.right=1);
-  document.getElementById('right').addEventListener('touchend',()=>move.right=0);
-
-  window.addEventListener('resize', onWindowResize);
+  addListeners();
 }
 
-function onWindowResize() {
-  camera.aspect = window.innerWidth/window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+function addListeners(){
+  window.addEventListener('resize',()=>{
+    camera.aspect=innerWidth/innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth,innerHeight);
+  });
+  document.body.addEventListener('click',()=>renderer.domElement.requestPointerLock());
+  document.addEventListener('mousemove',e=>{
+    if(document.pointerLockElement===renderer.domElement){
+      player.rotation.y-=e.movementX*0.002;
+      camera.rotation.x-=e.movementY*0.002;
+      camera.rotation.x=Math.max(-Math.PI/2,Math.min(Math.PI/2,camera.rotation.x));
+    }
+  });
+  document.addEventListener('keydown',e=>{
+    if(e.key==='w')move.f=1;if(e.key==='s')move.b=1;
+    if(e.key==='a')move.l=1;if(e.key==='d')move.r=1;
+  });
+  document.addEventListener('keyup',e=>{
+    if(e.key==='w')move.f=0;if(e.key==='s')move.b=0;
+    if(e.key==='a')move.l=0;if(e.key==='d')move.r=0;
+  });
 }
 
-function animate() {
+function animate(){
   requestAnimationFrame(animate);
-  const speed = 10;
-
-  let forward = new THREE.Vector3();
-  playerBody.getWorldDirection(forward);
-  forward.y = 0;
-  forward.normalize();
-
-  let right = new THREE.Vector3();
-  right.crossVectors(new THREE.Vector3(0,1,0), forward).normalize();
-
-  const vel = playerBody.body.getLinearVelocity();
-  let x = (move.right - move.left) * speed;
-  let z = (move.back - move.forward) * speed;
-
-  let newVel = new Ammo.btVector3(forward.x * -z + right.x * x, vel.y(), forward.z * -z + right.z * x);
-  playerBody.body.setLinearVelocity(newVel);
-
-  // Camera follow
-  camera.position.copy(playerBody.position).add(new THREE.Vector3(0,0.9,0));
-  camera.rotation.y = playerBody.rotation.y;
-
+  const speed=8;
+  const f=new THREE.Vector3();player.getWorldDirection(f);f.y=0;f.normalize();
+  const r=new THREE.Vector3();r.crossVectors(new THREE.Vector3(0,1,0),f).normalize();
+  const vel=player.body.getLinearVelocity();
+  const x=(move.r-move.l)*speed,z=(move.b-move.f)*speed;
+  const nv=new Ammo.btVector3(f.x*-z+r.x*x,vel.y(),f.z*-z+r.z*x);
+  player.body.setLinearVelocity(nv);
+  camera.position.copy(player.position).add(new THREE.Vector3(0,1.2,0));
+  camera.rotation.y=player.rotation.y;
   physics.update(1/60);
-  renderer.render(scene, camera);
+  renderer.render(scene,camera);
 }
 </script>
 </body>
